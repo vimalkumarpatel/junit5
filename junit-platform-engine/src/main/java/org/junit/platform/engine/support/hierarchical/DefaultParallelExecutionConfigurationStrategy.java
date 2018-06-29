@@ -73,14 +73,13 @@ public enum DefaultParallelExecutionConfigurationStrategy implements ParallelExe
 		public ParallelExecutionConfiguration createConfiguration(ConfigurationParameters configurationParameters) {
 			String className = configurationParameters.get(CONFIG_CUSTOM_CLASS_PROPERTY_NAME).orElseThrow(
 				() -> new JUnitException(CONFIG_CUSTOM_CLASS_PROPERTY_NAME + " must be set"));
-			Class<?> strategyClass = ReflectionUtils.loadClass(className).orElseThrow(
-				() -> new JUnitException("Could not load class for " + CONFIG_CUSTOM_CLASS_PROPERTY_NAME));
-			Preconditions.condition(ParallelExecutionConfigurationStrategy.class.isAssignableFrom(strategyClass),
-				CONFIG_CUSTOM_CLASS_PROPERTY_NAME + " does not implement "
-						+ ParallelExecutionConfigurationStrategy.class);
-			ParallelExecutionConfigurationStrategy strategy = (ParallelExecutionConfigurationStrategy) ReflectionUtils.newInstance(
-				strategyClass);
-			return strategy.createConfiguration(configurationParameters);
+			return ReflectionUtils.tryLoadClass(className).andThen(strategyClass -> {
+				Preconditions.condition(ParallelExecutionConfigurationStrategy.class.isAssignableFrom(strategyClass),
+					CONFIG_CUSTOM_CLASS_PROPERTY_NAME + " does not implement "
+							+ ParallelExecutionConfigurationStrategy.class);
+				return (ParallelExecutionConfigurationStrategy) ReflectionUtils.newInstance(strategyClass);
+			}).andThen(strategy -> strategy.createConfiguration(configurationParameters)).getOrThrow(
+				cause -> new JUnitException("Could not create configuration for strategy class: " + className, cause));
 		}
 	};
 

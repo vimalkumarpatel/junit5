@@ -523,7 +523,14 @@ public final class ReflectionUtils {
 	 * @see org.junit.platform.commons.support.ReflectionSupport#loadClass(String)
 	 */
 	public static Optional<Class<?>> loadClass(String name) {
-		return loadClass(name, ClassLoaderUtils.getDefaultClassLoader());
+		return tryLoadClass(name).toOptional();
+	}
+
+	/**
+	 * @see org.junit.platform.commons.support.ReflectionSupport#loadClass(String)
+	 */
+	public static Try<Class<?>> tryLoadClass(String name) {
+		return tryLoadClass(name, ClassLoaderUtils.getDefaultClassLoader());
 	}
 
 	/**
@@ -538,19 +545,34 @@ public final class ReflectionUtils {
 	 * @see #loadClass(String)
 	 */
 	public static Optional<Class<?>> loadClass(String name, ClassLoader classLoader) {
+		return tryLoadClass(name, classLoader).toOptional();
+	}
+
+	/**
+	 * Load a class by its <em>primitive name</em> or <em>fully qualified name</em>,
+	 * using the supplied {@link ClassLoader}.
+	 *
+	 * <p>See {@link org.junit.platform.commons.support.ReflectionSupport#loadClass(String)}
+	 * for details on support for class names for arrays.
+	 *
+	 * @param name the name of the class to load; never {@code null} or blank
+	 * @param classLoader the {@code ClassLoader} to use; never {@code null}
+	 * @see #loadClass(String)
+	 */
+	public static Try<Class<?>> tryLoadClass(String name, ClassLoader classLoader) {
 		Preconditions.notBlank(name, "Class name must not be null or blank");
 		Preconditions.notNull(classLoader, "ClassLoader must not be null");
-		name = name.trim();
+		String trimmedName = name.trim();
 
-		if (classNameToTypeMap.containsKey(name)) {
-			return Optional.of(classNameToTypeMap.get(name));
+		if (classNameToTypeMap.containsKey(trimmedName)) {
+			return Try.success(classNameToTypeMap.get(trimmedName));
 		}
 
-		try {
+		return Try.call(() -> {
 			Matcher matcher;
 
 			// Primitive arrays such as "[I", "[[[[D", etc.
-			matcher = VM_INTERNAL_PRIMITIVE_ARRAY_PATTERN.matcher(name);
+			matcher = VM_INTERNAL_PRIMITIVE_ARRAY_PATTERN.matcher(trimmedName);
 			if (matcher.matches()) {
 				String brackets = matcher.group(1);
 				String componentTypeName = matcher.group(2);
@@ -561,7 +583,7 @@ public final class ReflectionUtils {
 			}
 
 			// Object arrays such as "[Ljava.lang.String;", "[[[[Ljava.lang.String;", etc.
-			matcher = VM_INTERNAL_OBJECT_ARRAY_PATTERN.matcher(name);
+			matcher = VM_INTERNAL_OBJECT_ARRAY_PATTERN.matcher(trimmedName);
 			if (matcher.matches()) {
 				String brackets = matcher.group(1);
 				String componentTypeName = matcher.group(2);
@@ -572,7 +594,7 @@ public final class ReflectionUtils {
 			}
 
 			// Arrays such as "java.lang.String[]", "int[]", "int[][][][]", etc.
-			matcher = SOURCE_CODE_SYNTAX_ARRAY_PATTERN.matcher(name);
+			matcher = SOURCE_CODE_SYNTAX_ARRAY_PATTERN.matcher(trimmedName);
 			if (matcher.matches()) {
 				String componentTypeName = matcher.group(1);
 				String bracketPairs = matcher.group(2);
@@ -583,21 +605,18 @@ public final class ReflectionUtils {
 			}
 
 			// Fallback to standard VM class loading
-			return Optional.of(classLoader.loadClass(name));
-		}
-		catch (ClassNotFoundException ex) {
-			return Optional.empty();
-		}
+			return classLoader.loadClass(trimmedName);
+		});
 	}
 
-	private static Optional<Class<?>> loadArrayType(ClassLoader classLoader, String componentTypeName, int dimensions)
+	private static Class<?> loadArrayType(ClassLoader classLoader, String componentTypeName, int dimensions)
 			throws ClassNotFoundException {
 
 		Class<?> componentType = classNameToTypeMap.containsKey(componentTypeName)
 				? classNameToTypeMap.get(componentTypeName)
 				: classLoader.loadClass(componentTypeName);
 
-		return Optional.of(Array.newInstance(componentType, new int[dimensions]).getClass());
+		return Array.newInstance(componentType, new int[dimensions]).getClass();
 	}
 
 	/**
@@ -979,9 +998,12 @@ public final class ReflectionUtils {
 	}
 
 	private static Class<?> loadRequiredParameterType(Class<?> clazz, String methodName, String typeName) {
-		return loadClass(typeName).orElseThrow(
-			() -> new JUnitException(String.format("Failed to load parameter type [%s] for method [%s] in class [%s].",
-				typeName, methodName, clazz.getName())));
+		// @formatter:off
+		return tryLoadClass(typeName)
+				.getOrThrow(cause -> new JUnitException(
+						String.format("Failed to load parameter type [%s] for method [%s] in class [%s].",
+								typeName, methodName, clazz.getName()), cause));
+		// @formatter:on
 	}
 
 	/**

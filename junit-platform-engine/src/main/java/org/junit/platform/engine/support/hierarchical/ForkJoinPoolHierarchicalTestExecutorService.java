@@ -31,6 +31,7 @@ import java.util.function.Predicate;
 import org.apiguardian.api.API;
 import org.junit.platform.commons.logging.LoggerFactory;
 import org.junit.platform.commons.util.ExceptionUtils;
+import org.junit.platform.commons.util.Try;
 import org.junit.platform.engine.ConfigurationParameters;
 
 /**
@@ -63,7 +64,7 @@ public class ForkJoinPoolHierarchicalTestExecutorService implements Hierarchical
 		ParallelExecutionConfigurationStrategy strategy = DefaultParallelExecutionConfigurationStrategy.getStrategy(
 			configurationParameters);
 		ParallelExecutionConfiguration configuration = strategy.createConfiguration(configurationParameters);
-		try {
+		return Try.call(() -> {
 			// Try to use constructor available in Java >= 9
 			Constructor<ForkJoinPool> constructor = ForkJoinPool.class.getDeclaredConstructor(Integer.TYPE,
 				ForkJoinWorkerThreadFactory.class, UncaughtExceptionHandler.class, Boolean.TYPE, Integer.TYPE,
@@ -71,11 +72,10 @@ public class ForkJoinPoolHierarchicalTestExecutorService implements Hierarchical
 			return constructor.newInstance(configuration.getParallelism(), defaultForkJoinWorkerThreadFactory, null,
 				false, configuration.getCorePoolSize(), configuration.getMaxPoolSize(),
 				configuration.getMinimumRunnable(), null, configuration.getKeepAlive(), TimeUnit.SECONDS);
-		}
-		catch (Exception e) {
+		}).orElse(() -> {
 			// Fallback for Java 8
 			return new ForkJoinPool(configuration.getParallelism());
-		}
+		}).get();
 	}
 
 	@Override
