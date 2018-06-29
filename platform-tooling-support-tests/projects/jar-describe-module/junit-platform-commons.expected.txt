@@ -2,8 +2,10 @@
 
 org.junit.platform.commons@${platformVersion} automatic
 requires java.base mandated
+provides javax.script.ScriptEngineFactory with org.junit.platform.commons.jshellscriptengine.jshellscriptenginefactory
 contains org.junit.platform.commons
 contains org.junit.platform.commons.annotation
+contains org.junit.platform.commons.jshellscriptengine
 contains org.junit.platform.commons.logging
 contains org.junit.platform.commons.support
 contains org.junit.platform.commons.util

@@ -131,7 +131,11 @@ allprojects { subproj ->
 	// See: https://docs.oracle.com/javase/9/tools/javac.htm#JSWOR627
 	compileJava.options.compilerArgs += [
 		'-Xlint:cast',
-		'-Xlint:classfile',
+		// /89/javax/script/Bindings.sig: warning: Cannot find annotation method 'value()' in type 'Profile+Annotation':
+		// class file for jdk.Profile+Annotation not found
+		//
+		// '-Xlint:classfile',
+		//
 		'-Xlint:deprecation',
 		'-Xlint:dep-ann',
 		'-Xlint:divzero',

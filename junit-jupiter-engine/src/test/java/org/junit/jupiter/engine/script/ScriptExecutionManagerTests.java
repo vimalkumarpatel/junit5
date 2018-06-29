@@ -27,6 +27,7 @@ import javax.script.ScriptEngine;
 import javax.script.ScriptException;
 import javax.script.SimpleBindings;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestFactory;
@@ -66,9 +67,31 @@ class ScriptExecutionManagerTests {
 	}
 
 	private void findJavaScriptEngine(String string) {
+		findScriptEngine(string, "ECMAScript");
+	}
+
+	private void findScriptEngine(String string, String expectedLanguageName) {
 		ScriptEngine engine = manager.createScriptEngine(string);
 		assertNotNull(engine);
-		assertEquals("ECMAScript", engine.getFactory().getLanguageName());
+		assertEquals(expectedLanguageName, engine.getFactory().getLanguageName());
+	}
+
+	@Test
+	void findJShellScriptEngine() {
+		String language = "Java";
+		assertAll("Names", //
+			() -> findScriptEngine("Java", language), //
+			() -> findScriptEngine("java", language), //
+			() -> findScriptEngine("JShell", language), //
+			() -> findScriptEngine("jshell", language) //
+		);
+	}
+
+	@Test
+	@Disabled("needs '-java9' multi-release jar environment support")
+	void evaluateJShellScript() throws ScriptException {
+		Script script = scriptForEngine("JShell", "if (0 == 0) {", "  return Boolean.TRUE;", "}", "return false;");
+		assertTrue((boolean) manager.evaluate(script, bindings));
 	}
 
 	@Test
@@ -124,11 +147,15 @@ class ScriptExecutionManagerTests {
 	}
 
 	private Script script(String... lines) {
+		return scriptForEngine(Script.DEFAULT_SCRIPT_ENGINE_NAME, lines);
+	}
+
+	private Script scriptForEngine(String scriptEngineName, String... lines) {
 		Class<? extends Annotation> type = Test.class;
 		return new Script( //
 			type, //
 			"Mock for " + type, //
-			Script.DEFAULT_SCRIPT_ENGINE_NAME, //
+			scriptEngineName, //
 			String.join("\n", lines), //
 			Script.DEFAULT_SCRIPT_REASON_PATTERN //
 		);
