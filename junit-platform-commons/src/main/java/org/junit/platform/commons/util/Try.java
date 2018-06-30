@@ -13,12 +13,17 @@ package org.junit.platform.commons.util;
 import java.util.Optional;
 import java.util.concurrent.Callable;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 public abstract class Try<V> {
 
 	public static <V> Try<V> call(Callable<V> action) {
+		return Try.of(() -> success(action.call()));
+	}
+
+	public static <V> Try<V> of(ThrowingSupplier<Try<V>> action) {
 		try {
-			return success(action.call());
+			return action.get();
 		}
 		catch (Exception e) {
 			return failure(e);
@@ -33,19 +38,28 @@ public abstract class Try<V> {
 		return new Failure<>(Preconditions.notNull(cause, "cause must not be null"));
 	}
 
-	public abstract <U> Try<U> andThen(Transformer<V, U> action);
+	public abstract <U> Try<U> andThenTry(Transformer<V, U> action);
 
-	public abstract Try<V> orElse(Callable<V> action);
+	public abstract <U> Try<U> andThen(Function<V, Try<U>> action);
+
+	public abstract Try<V> orElseTry(Callable<V> action);
+
+	public abstract Try<V> orElse(Supplier<Try<V>> action);
 
 	public abstract V get();
 
-	public abstract V getOrThrow(Function<Exception, Exception> exceptionCreator);
+	public abstract V getOrThrow(Function<? super Exception, ? extends Throwable> throwableCreator);
 
 	public abstract Optional<V> toOptional();
 
 	@FunctionalInterface
 	public interface Transformer<S, T> {
 		T apply(S input) throws Exception;
+	}
+
+	@FunctionalInterface
+	public interface ThrowingSupplier<T> {
+		T get() throws Exception;
 	}
 
 	private static class Success<V> extends Try<V> {
@@ -57,12 +71,22 @@ public abstract class Try<V> {
 		}
 
 		@Override
-		public <U> Try<U> andThen(Transformer<V, U> action) {
-			return call(() -> action.apply(value));
+		public <U> Try<U> andThenTry(Transformer<V, U> action) {
+			return Try.call(() -> action.apply(value));
 		}
 
 		@Override
-		public Try<V> orElse(Callable<V> action) {
+		public <U> Try<U> andThen(Function<V, Try<U>> action) {
+			return Try.of(() -> action.apply(value));
+		}
+
+		@Override
+		public Try<V> orElseTry(Callable<V> action) {
+			return this;
+		}
+
+		@Override
+		public Try<V> orElse(Supplier<Try<V>> action) {
 			return this;
 		}
 
@@ -72,7 +96,7 @@ public abstract class Try<V> {
 		}
 
 		@Override
-		public V getOrThrow(Function<Exception, Exception> exceptionCreator) {
+		public V getOrThrow(Function<? super Exception, ? extends Throwable> throwableCreator) {
 			return value;
 		}
 
@@ -91,13 +115,23 @@ public abstract class Try<V> {
 		}
 
 		@Override
-		public <U> Try<U> andThen(Transformer<V, U> action) {
+		public <U> Try<U> andThenTry(Transformer<V, U> action) {
 			return new Failure<>(cause);
 		}
 
 		@Override
-		public Try<V> orElse(Callable<V> action) {
-			return call(action);
+		public <U> Try<U> andThen(Function<V, Try<U>> action) {
+			return new Failure<>(cause);
+		}
+
+		@Override
+		public Try<V> orElseTry(Callable<V> action) {
+			return Try.call(action);
+		}
+
+		@Override
+		public Try<V> orElse(Supplier<Try<V>> action) {
+			return Try.of(action::get);
 		}
 
 		@Override
@@ -106,8 +140,8 @@ public abstract class Try<V> {
 		}
 
 		@Override
-		public V getOrThrow(Function<Exception, Exception> exceptionCreator) {
-			throw ExceptionUtils.throwAsUncheckedException(exceptionCreator.apply(cause));
+		public V getOrThrow(Function<? super Exception, ? extends Throwable> throwableCreator) {
+			throw ExceptionUtils.throwAsUncheckedException(throwableCreator.apply(cause));
 		}
 
 		@Override

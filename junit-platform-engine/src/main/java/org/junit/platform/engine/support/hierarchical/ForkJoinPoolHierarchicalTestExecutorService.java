@@ -72,7 +72,7 @@ public class ForkJoinPoolHierarchicalTestExecutorService implements Hierarchical
 			return constructor.newInstance(configuration.getParallelism(), defaultForkJoinWorkerThreadFactory, null,
 				false, configuration.getCorePoolSize(), configuration.getMaxPoolSize(),
 				configuration.getMinimumRunnable(), null, configuration.getKeepAlive(), TimeUnit.SECONDS);
-		}).orElse(() -> {
+		}).orElseTry(() -> {
 			// Fallback for Java 8
 			return new ForkJoinPool(configuration.getParallelism());
 		}).get();

@@ -450,18 +450,18 @@ public final class ReflectionUtils {
 	 * @see #readFieldValue(Field, Object)
 	 */
 	public static <T> Optional<Object> readFieldValue(Class<T> clazz, String fieldName, T instance) {
+		return tryReadFieldValue(clazz, fieldName, instance).toOptional();
+	}
+
+	public static <T> Try<Object> tryReadFieldValue(Class<T> clazz, String fieldName, T instance) {
 		Preconditions.notNull(clazz, "Class must not be null");
 		Preconditions.notBlank(fieldName, "Field name must not be null or blank");
 
-		Field field = null;
-		try {
-			field = makeAccessible(clazz.getDeclaredField(fieldName));
-		}
-		catch (Throwable t) {
-			BlacklistedExceptions.rethrowIfBlacklisted(t);
-			return Optional.empty();
-		}
-		return readFieldValue(field, instance);
+		// @formatter:off
+		return Try.call(() -> clazz.getDeclaredField(fieldName))
+				.andThenTry(ReflectionUtils::makeAccessible)
+				.andThen(field -> tryReadFieldValue(field, instance));
+		// @formatter:on
 	}
 
 	/**
@@ -475,7 +475,11 @@ public final class ReflectionUtils {
 	 * @see #readFieldValue(Class, String, Object)
 	 */
 	public static Optional<Object> readFieldValue(Field field) {
-		return readFieldValue(field, null);
+		return tryReadFieldValue(field).toOptional();
+	}
+
+	public static Try<Object> tryReadFieldValue(Field field) {
+		return tryReadFieldValue(field, null);
 	}
 
 	/**
@@ -491,16 +495,19 @@ public final class ReflectionUtils {
 	 * @see #readFieldValue(Class, String, Object)
 	 */
 	public static <T> Optional<Object> readFieldValue(Field field, T instance) {
+		return tryReadFieldValue(field, instance).toOptional();
+	}
+
+	/**
+	 * @see #readFieldValue(Field, Object)
+	 */
+	public static Try<Object> tryReadFieldValue(Field field, Object instance) {
 		Preconditions.notNull(field, "Field must not be null");
 
-		try {
+		return Try.call(() -> {
 			makeAccessible(field);
-			return Optional.ofNullable(field.get(instance));
-		}
-		catch (Throwable t) {
-			BlacklistedExceptions.rethrowIfBlacklisted(t);
-			return Optional.empty();
-		}
+			return field.get(instance);
+		});
 	}
 
 	/**
@@ -963,18 +970,14 @@ public final class ReflectionUtils {
 	 * {@link NoSuchMethodException}
 	 */
 	static Optional<Method> getMethod(Class<?> clazz, String methodName, Class<?>... parameterTypes) {
+		return tryGetMethod(clazz, methodName, parameterTypes).toOptional();
+	}
+
+	static Try<Method> tryGetMethod(Class<?> clazz, String methodName, Class<?>... parameterTypes) {
 		Preconditions.notNull(clazz, "Class must not be null");
 		Preconditions.notBlank(methodName, "Method name must not be null or blank");
 
-		try {
-			return Optional.ofNullable(clazz.getMethod(methodName, parameterTypes));
-		}
-		catch (NoSuchMethodException ex) {
-			return Optional.empty();
-		}
-		catch (Throwable t) {
-			throw ExceptionUtils.throwAsUncheckedException(t);
-		}
+		return Try.call(() -> clazz.getMethod(methodName, parameterTypes));
 	}
 
 	/**
