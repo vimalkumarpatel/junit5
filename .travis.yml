@@ -34,7 +34,7 @@ script:
 # Display Gradle, Groovy, JVM and other versions
   - ./gradlew --version
 # Build JUnit 5
-  - ./gradlew --stacktrace --info ${SCAN} ${JACOCO} build ${INSTALL}
+  - ./gradlew --stacktrace --debug ${SCAN} ${JACOCO} build ${INSTALL}
 
 after_success:
 # If variable JACOCO is set, run JaCoCo report and send report to codecov.io after build success
