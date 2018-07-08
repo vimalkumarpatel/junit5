@@ -79,8 +79,8 @@ class PackageUtilsTests {
 
 	@Test
 	void getAttributeFromDefaultPackageMemberIsEmpty() {
-		Class<?> classInDefaultPackage = ReflectionUtils.loadClass("DefaultPackageTestCase").orElseGet(
-			() -> fail("Could not load class from default package"));
+		Class<?> classInDefaultPackage = ReflectionUtils.tryToLoadClass("DefaultPackageTestCase").getOrThrow(
+			cause -> fail("Could not load class from default package", cause));
 		assertFalse(PackageUtils.getAttribute(classInDefaultPackage, Package::getSpecificationTitle).isPresent());
 	}
 

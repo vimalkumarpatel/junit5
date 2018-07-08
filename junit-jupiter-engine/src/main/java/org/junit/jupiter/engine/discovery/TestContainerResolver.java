@@ -58,7 +58,7 @@ class TestContainerResolver implements ElementResolver {
 
 		String className = getClassName(parent, segment.getValue());
 
-		Optional<Class<?>> optionalContainerClass = ReflectionUtils.loadClass(className);
+		Optional<Class<?>> optionalContainerClass = ReflectionUtils.tryToLoadClass(className).toOptional();
 		if (!optionalContainerClass.isPresent()) {
 			return Optional.empty();
 		}

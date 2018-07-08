@@ -29,9 +29,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 
 import org.apiguardian.api.API;
+import org.junit.platform.commons.function.Try;
 import org.junit.platform.commons.logging.LoggerFactory;
 import org.junit.platform.commons.util.ExceptionUtils;
-import org.junit.platform.commons.util.Try;
 import org.junit.platform.engine.ConfigurationParameters;
 
 /**

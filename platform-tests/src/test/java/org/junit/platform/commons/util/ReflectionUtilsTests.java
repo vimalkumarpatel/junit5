@@ -18,12 +18,13 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.platform.commons.function.Try.success;
 import static org.junit.platform.commons.util.ReflectionUtils.HierarchyTraversalMode.BOTTOM_UP;
 import static org.junit.platform.commons.util.ReflectionUtils.HierarchyTraversalMode.TOP_DOWN;
 import static org.junit.platform.commons.util.ReflectionUtils.findMethod;
 import static org.junit.platform.commons.util.ReflectionUtils.findMethods;
 import static org.junit.platform.commons.util.ReflectionUtils.invokeMethod;
-import static org.junit.platform.commons.util.ReflectionUtils.readFieldValue;
+import static org.junit.platform.commons.util.ReflectionUtils.tryToReadFieldValue;
 
 import java.io.File;
 import java.io.IOException;
@@ -139,34 +140,37 @@ class ReflectionUtilsTests {
 	}
 
 	@Test
-	void readFieldValueOfNonexistentStaticField() {
-		assertThat(readFieldValue(MyClass.class, "doesNotExist", null)).isNotPresent();
-		assertThat(readFieldValue(MySubClass.class, "staticField", null)).isNotPresent();
+	void tryToReadFieldValueOfNonexistentStaticField() {
+		assertThrows(NoSuchFieldException.class, () -> tryToReadFieldValue(MyClass.class, "doesNotExist", null).get());
+		assertThrows(NoSuchFieldException.class,
+			() -> tryToReadFieldValue(MySubClass.class, "staticField", null).get());
 	}
 
 	@Test
-	void readFieldValueOfNonexistentInstanceField() {
-		assertThat(readFieldValue(MyClass.class, "doesNotExist", new MyClass(42))).isNotPresent();
-		assertThat(readFieldValue(MyClass.class, "doesNotExist", new MySubClass(42))).isNotPresent();
+	void tryToReadFieldValueOfNonexistentInstanceField() {
+		assertThrows(NoSuchFieldException.class,
+			() -> tryToReadFieldValue(MyClass.class, "doesNotExist", new MyClass(42)).get());
+		assertThrows(NoSuchFieldException.class,
+			() -> tryToReadFieldValue(MyClass.class, "doesNotExist", new MySubClass(42)).get());
 	}
 
 	@Test
-	void readFieldValueOfExistingStaticField() throws Exception {
-		assertThat(readFieldValue(MyClass.class, "staticField", null)).contains(42);
+	void tryToReadFieldValueOfExistingStaticField() throws Exception {
+		assertThat(tryToReadFieldValue(MyClass.class, "staticField", null).get()).isEqualTo(42);
 
 		Field field = MyClass.class.getDeclaredField("staticField");
-		assertThat(readFieldValue(field)).contains(42);
-		assertThat(readFieldValue(field, null)).contains(42);
+		assertThat(tryToReadFieldValue(field).get()).isEqualTo(42);
+		assertThat(tryToReadFieldValue(field, null).get()).isEqualTo(42);
 	}
 
 	@Test
-	void readFieldValueOfExistingInstanceField() throws Exception {
+	void tryToReadFieldValueOfExistingInstanceField() throws Exception {
 		MyClass instance = new MyClass(42);
-		assertThat(readFieldValue(MyClass.class, "instanceField", instance)).contains(42);
+		assertThat(tryToReadFieldValue(MyClass.class, "instanceField", instance).get()).isEqualTo(42);
 
 		Field field = MyClass.class.getDeclaredField("instanceField");
-		assertThat(readFieldValue(field, instance)).contains(42);
-		assertThat(readFieldValue(field, null)).isNotPresent();
+		assertThat(tryToReadFieldValue(field, instance).get()).isEqualTo(42);
+		assertThrows(NullPointerException.class, () -> tryToReadFieldValue(field, null).get());
 	}
 
 	@Test
@@ -330,99 +334,89 @@ class ReflectionUtilsTests {
 	}
 
 	@Test
-	void loadClassPreconditions() {
-		assertThrows(PreconditionViolationException.class, () -> ReflectionUtils.loadClass(null));
-		assertThrows(PreconditionViolationException.class, () -> ReflectionUtils.loadClass(""));
-		assertThrows(PreconditionViolationException.class, () -> ReflectionUtils.loadClass("   "));
+	void tryToLoadClassPreconditions() {
+		assertThrows(PreconditionViolationException.class, () -> ReflectionUtils.tryToLoadClass(null));
+		assertThrows(PreconditionViolationException.class, () -> ReflectionUtils.tryToLoadClass(""));
+		assertThrows(PreconditionViolationException.class, () -> ReflectionUtils.tryToLoadClass("   "));
 
-		assertThrows(PreconditionViolationException.class, () -> ReflectionUtils.loadClass(null, null));
-		assertThrows(PreconditionViolationException.class, () -> ReflectionUtils.loadClass(getClass().getName(), null));
+		assertThrows(PreconditionViolationException.class, () -> ReflectionUtils.tryToLoadClass(null, null));
+		assertThrows(PreconditionViolationException.class,
+			() -> ReflectionUtils.tryToLoadClass(getClass().getName(), null));
 	}
 
 	@Test
-	void loadClassWhenClassNotFoundException() {
-		assertThat(ReflectionUtils.loadClass("foo.bar.EnigmaClassThatDoesNotExist")).isEmpty();
+	void tryToLoadClassWhenClassNotFoundException() {
+		assertThrows(ClassNotFoundException.class,
+			() -> ReflectionUtils.tryToLoadClass("foo.bar.EnigmaClassThatDoesNotExist").get());
 	}
 
 	@Test
-	void loadClass() {
-		Optional<Class<?>> optional = ReflectionUtils.loadClass(Integer.class.getName());
-		assertThat(optional).contains(Integer.class);
+	void tryToLoadClass() {
+		assertThat(ReflectionUtils.tryToLoadClass(Integer.class.getName())).isEqualTo(success(Integer.class));
 	}
 
 	@Test
-	void loadClassTrimsClassName() {
-		Optional<Class<?>> optional = ReflectionUtils.loadClass("  " + Integer.class.getName() + "\t");
-		assertThat(optional).contains(Integer.class);
+	void tryToLoadClassTrimsClassName() {
+		assertThat(ReflectionUtils.tryToLoadClass("  " + Integer.class.getName() + "\t")).isEqualTo(
+			success(Integer.class));
 	}
 
 	@Test
-	void loadClassForPrimitive() {
-		Optional<Class<?>> optional = ReflectionUtils.loadClass(int.class.getName());
-		assertThat(optional).contains(int.class);
+	void tryToLoadClassForPrimitive() {
+		assertThat(ReflectionUtils.tryToLoadClass(int.class.getName())).isEqualTo(success(int.class));
 	}
 
 	@Test
-	void loadClassForPrimitiveArray() {
-		Optional<Class<?>> optional = ReflectionUtils.loadClass(int[].class.getName());
-		assertThat(optional).contains(int[].class);
+	void tryToLoadClassForPrimitiveArray() {
+		assertThat(ReflectionUtils.tryToLoadClass(int[].class.getName())).isEqualTo(success(int[].class));
 	}
 
 	@Test
-	void loadClassForPrimitiveArrayUsingSourceCodeSyntax() {
-		Optional<Class<?>> optional = ReflectionUtils.loadClass("int[]");
-		assertThat(optional).contains(int[].class);
+	void tryToLoadClassForPrimitiveArrayUsingSourceCodeSyntax() {
+		assertThat(ReflectionUtils.tryToLoadClass("int[]")).isEqualTo(success(int[].class));
 	}
 
 	@Test
-	void loadClassForObjectArray() {
-		Optional<Class<?>> optional = ReflectionUtils.loadClass(String[].class.getName());
-		assertThat(optional).contains(String[].class);
+	void tryToLoadClassForObjectArray() {
+		assertThat(ReflectionUtils.tryToLoadClass(String[].class.getName())).isEqualTo(success(String[].class));
 	}
 
 	@Test
-	void loadClassForObjectArrayUsingSourceCodeSyntax() {
-		Optional<Class<?>> optional = ReflectionUtils.loadClass("java.lang.String[]");
-		assertThat(optional).contains(String[].class);
+	void tryToLoadClassForObjectArrayUsingSourceCodeSyntax() {
+		assertThat(ReflectionUtils.tryToLoadClass("java.lang.String[]")).isEqualTo(success(String[].class));
 	}
 
 	@Test
-	void loadClassForTwoDimensionalPrimitiveArray() {
-		Optional<Class<?>> optional = ReflectionUtils.loadClass(int[][].class.getName());
-		assertThat(optional).contains(int[][].class);
+	void tryToLoadClassForTwoDimensionalPrimitiveArray() {
+		assertThat(ReflectionUtils.tryToLoadClass(int[][].class.getName())).isEqualTo(success(int[][].class));
 	}
 
 	@Test
-	void loadClassForTwoDimensionaldimensionalPrimitiveArrayUsingSourceCodeSyntax() {
-		Optional<Class<?>> optional = ReflectionUtils.loadClass("int[][]");
-		assertThat(optional).contains(int[][].class);
+	void tryToLoadClassForTwoDimensionaldimensionalPrimitiveArrayUsingSourceCodeSyntax() {
+		assertThat(ReflectionUtils.tryToLoadClass("int[][]")).isEqualTo(success(int[][].class));
 	}
 
 	@Test
-	void loadClassForMultidimensionalPrimitiveArray() {
-		String className = int[][][][][].class.getName();
-		Optional<Class<?>> optional = ReflectionUtils.loadClass(className);
-		assertThat(optional).as(className).contains(int[][][][][].class);
+	void tryToLoadClassForMultidimensionalPrimitiveArray() {
+		assertThat(ReflectionUtils.tryToLoadClass(int[][][][][].class.getName())).isEqualTo(
+			success(int[][][][][].class));
 	}
 
 	@Test
-	void loadClassForMultidimensionalPrimitiveArrayUsingSourceCodeSyntax() {
-		String className = "int[][][][][]";
-		Optional<Class<?>> optional = ReflectionUtils.loadClass(className);
-		assertThat(optional).as(className).contains(int[][][][][].class);
+	void tryToLoadClassForMultidimensionalPrimitiveArrayUsingSourceCodeSyntax() {
+		assertThat(ReflectionUtils.tryToLoadClass("int[][][][][]")).isEqualTo(success(int[][][][][].class));
 	}
 
 	@Test
-	void loadClassForMultidimensionalObjectArray() {
-		String className = String[][][][][].class.getName();
-		Optional<Class<?>> optional = ReflectionUtils.loadClass(className);
-		assertThat(optional).as(className).contains(String[][][][][].class);
+	void tryToLoadClassForMultidimensionalObjectArray() {
+		assertThat(ReflectionUtils.tryToLoadClass(String[][][][][].class.getName())).isEqualTo(
+			success(String[][][][][].class));
 	}
 
 	@Test
-	void loadClassForMultidimensionalObjectArrayUsingSourceCodeSyntax() {
-		Optional<Class<?>> optional = ReflectionUtils.loadClass("java.lang.String[][][][][]");
-		assertThat(optional).contains(String[][][][][].class);
+	void tryToLoadClassForMultidimensionalObjectArrayUsingSourceCodeSyntax() {
+		assertThat(ReflectionUtils.tryToLoadClass("java.lang.String[][][][][]")).isEqualTo(
+			success(String[][][][][].class));
 	}
 
 	@Test
@@ -612,24 +606,26 @@ class ReflectionUtilsTests {
 	}
 
 	@Test
-	void getMethodPreconditions() {
-		assertThrows(PreconditionViolationException.class, () -> ReflectionUtils.getMethod(null, null));
-		assertThrows(PreconditionViolationException.class, () -> ReflectionUtils.getMethod(String.class, null));
-		assertThrows(PreconditionViolationException.class, () -> ReflectionUtils.getMethod(null, "hashCode"));
+	void tryToGetMethodPreconditions() {
+		assertThrows(PreconditionViolationException.class, () -> ReflectionUtils.tryToGetMethod(null, null));
+		assertThrows(PreconditionViolationException.class, () -> ReflectionUtils.tryToGetMethod(String.class, null));
+		assertThrows(PreconditionViolationException.class, () -> ReflectionUtils.tryToGetMethod(null, "hashCode"));
 	}
 
 	@Test
-	void getMethod() throws Exception {
-		assertThat(ReflectionUtils.getMethod(Object.class, "hashCode")).contains(Object.class.getMethod("hashCode"));
-		assertThat(ReflectionUtils.getMethod(String.class, "charAt", int.class))//
-				.contains(String.class.getMethod("charAt", int.class));
+	void tryToGetMethod() throws Exception {
+		assertThat(ReflectionUtils.tryToGetMethod(Object.class, "hashCode").get()).isEqualTo(
+			Object.class.getMethod("hashCode"));
+		assertThat(ReflectionUtils.tryToGetMethod(String.class, "charAt", int.class).get())//
+				.isEqualTo(String.class.getMethod("charAt", int.class));
 
-		assertThat(ReflectionUtils.getMethod(Path.class, "subpath", int.class, int.class))//
-				.contains(Path.class.getMethod("subpath", int.class, int.class));
-		assertThat(ReflectionUtils.getMethod(String.class, "chars")).contains(String.class.getMethod("chars"));
+		assertThat(ReflectionUtils.tryToGetMethod(Path.class, "subpath", int.class, int.class).get())//
+				.isEqualTo(Path.class.getMethod("subpath", int.class, int.class));
+		assertThat(ReflectionUtils.tryToGetMethod(String.class, "chars").get()).isEqualTo(
+			String.class.getMethod("chars"));
 
-		assertThat(ReflectionUtils.getMethod(String.class, "noSuchMethod")).isEmpty();
-		assertThat(ReflectionUtils.getMethod(Object.class, "clone", int.class)).isEmpty();
+		assertThat(ReflectionUtils.tryToGetMethod(String.class, "noSuchMethod").toOptional()).isEmpty();
+		assertThat(ReflectionUtils.tryToGetMethod(Object.class, "clone", int.class).toOptional()).isEmpty();
 	}
 
 	@Test

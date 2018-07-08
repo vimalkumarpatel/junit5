@@ -74,7 +74,7 @@ class MethodArgumentsProvider implements ArgumentsProvider, AnnotationConsumer<M
 	}
 
 	private Class<?> loadRequiredClass(String className) {
-		return ReflectionUtils.tryLoadClass(className).getOrThrow(
+		return ReflectionUtils.tryToLoadClass(className).getOrThrow(
 			cause -> new JUnitException(format("Could not load class [%s]", className), cause));
 	}
 

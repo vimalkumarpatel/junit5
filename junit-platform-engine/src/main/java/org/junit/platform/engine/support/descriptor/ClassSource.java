@@ -116,7 +116,7 @@ public class ClassSource implements TestSource {
 	 */
 	public final Class<?> getJavaClass() {
 		if (this.javaClass == null) {
-			this.javaClass = ReflectionUtils.tryLoadClass(this.className).getOrThrow(
+			this.javaClass = ReflectionUtils.tryToLoadClass(this.className).getOrThrow(
 				cause -> new PreconditionViolationException("Could not load class with name: " + this.className,
 					cause));
 		}

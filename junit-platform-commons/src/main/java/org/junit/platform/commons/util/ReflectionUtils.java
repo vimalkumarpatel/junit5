@@ -13,6 +13,7 @@ package org.junit.platform.commons.util;
 import static java.util.stream.Collectors.toCollection;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
+import static org.apiguardian.api.API.Status.DEPRECATED;
 import static org.apiguardian.api.API.Status.INTERNAL;
 import static org.junit.platform.commons.util.CollectionUtils.toUnmodifiableList;
 import static org.junit.platform.commons.util.ReflectionUtils.HierarchyTraversalMode.BOTTOM_UP;
@@ -50,6 +51,7 @@ import java.util.regex.Pattern;
 
 import org.apiguardian.api.API;
 import org.junit.platform.commons.JUnitException;
+import org.junit.platform.commons.function.Try;
 import org.junit.platform.commons.logging.Logger;
 import org.junit.platform.commons.logging.LoggerFactory;
 
@@ -115,7 +117,7 @@ public final class ReflectionUtils {
 	private static final Class<?>[] EMPTY_CLASS_ARRAY = new Class<?>[0];
 
 	private static final ClasspathScanner classpathScanner = new ClasspathScanner(
-		ClassLoaderUtils::getDefaultClassLoader, ReflectionUtils::loadClass);
+		ClassLoaderUtils::getDefaultClassLoader, ReflectionUtils::tryToLoadClass);
 
 	/**
 	 * Internal cache of common class names mapped to their types.
@@ -448,19 +450,37 @@ public final class ReflectionUtils {
 	 * be {@code null} for a static field
 	 * @see #readFieldValue(Field)
 	 * @see #readFieldValue(Field, Object)
+	 * @deprecated Please use {@link #tryToReadFieldValue(Class, String, Object)}
+	 * instead.
 	 */
+	@API(status = DEPRECATED, since = "1.3")
+	@Deprecated
 	public static <T> Optional<Object> readFieldValue(Class<T> clazz, String fieldName, T instance) {
-		return tryReadFieldValue(clazz, fieldName, instance).toOptional();
+		return tryToReadFieldValue(clazz, fieldName, instance).toOptional();
 	}
 
-	public static <T> Try<Object> tryReadFieldValue(Class<T> clazz, String fieldName, T instance) {
+	/**
+	 * Try to read the value of a potentially inaccessible or nonexistent field.
+	 *
+	 * <p>If the field does not exist, an exception occurs while reading it, or
+	 * the value of the field is {@code null}, an failed {@link Try} is
+	 * returned that contains the corresponding exception.
+	 *
+	 * @param clazz the class where the field is declared; never {@code null}
+	 * @param fieldName the name of the field; never {@code null} or empty
+	 * @param instance the instance from where the value is to be read; may
+	 * be {@code null} for a static field
+	 * @see #readFieldValue(Field)
+	 * @see #readFieldValue(Field, Object)
+	 */
+	@API(status = INTERNAL, since = "1.3")
+	public static <T> Try<Object> tryToReadFieldValue(Class<T> clazz, String fieldName, T instance) {
 		Preconditions.notNull(clazz, "Class must not be null");
 		Preconditions.notBlank(fieldName, "Field name must not be null or blank");
 
 		// @formatter:off
 		return Try.call(() -> clazz.getDeclaredField(fieldName))
-				.andThenTry(ReflectionUtils::makeAccessible)
-				.andThen(field -> tryReadFieldValue(field, instance));
+				.andThen(field -> tryToReadFieldValue(field, instance));
 		// @formatter:on
 	}
 
@@ -473,13 +493,29 @@ public final class ReflectionUtils {
 	 * @param field the field to read; never {@code null}
 	 * @see #readFieldValue(Field, Object)
 	 * @see #readFieldValue(Class, String, Object)
+	 * @deprecated Please use {@link #tryToReadFieldValue(Field)} instead.
 	 */
+	@API(status = DEPRECATED, since = "1.3")
+	@Deprecated
 	public static Optional<Object> readFieldValue(Field field) {
-		return tryReadFieldValue(field).toOptional();
+		return tryToReadFieldValue(field).toOptional();
 	}
 
-	public static Try<Object> tryReadFieldValue(Field field) {
-		return tryReadFieldValue(field, null);
+	/**
+	 * Try to read the value of a potentially inaccessible static field.
+	 *
+	 * <p>If an exception occurs while reading the field or if the value of the
+	 * field is {@code null}, an failed {@link Try} is returned that contains
+	 * the corresponding exception.
+	 *
+	 * @param field the field to read; never {@code null}
+	 * @see #readFieldValue(Field, Object)
+	 * @see #readFieldValue(Class, String, Object)
+	 * @since 1.3
+	 */
+	@API(status = INTERNAL, since = "1.3")
+	public static Try<Object> tryToReadFieldValue(Field field) {
+		return tryToReadFieldValue(field, null);
 	}
 
 	/**
@@ -493,21 +529,34 @@ public final class ReflectionUtils {
 	 * be {@code null} for a static field
 	 * @see #readFieldValue(Field)
 	 * @see #readFieldValue(Class, String, Object)
+	 * @deprecated Please use {@link #tryToReadFieldValue(Field, Object)}
+	 * instead.
 	 */
+	@API(status = DEPRECATED, since = "1.3")
+	@Deprecated
 	public static <T> Optional<Object> readFieldValue(Field field, T instance) {
-		return tryReadFieldValue(field, instance).toOptional();
+		return tryToReadFieldValue(field, instance).toOptional();
 	}
 
 	/**
-	 * @see #readFieldValue(Field, Object)
+	 * Try to read the value of a potentially inaccessible field.
+	 *
+	 * <p>If an exception occurs while reading the field or if the value of the
+	 * field is {@code null}, a failed {@link Try} is returned that contains the
+	 * corresponding exception.
+	 *
+	 * @param field the field to read; never {@code null}
+	 * @param instance the instance from which the value is to be read; may
+	 * be {@code null} for a static field
+	 * @see #readFieldValue(Field)
+	 * @see #readFieldValue(Class, String, Object)
+	 * @since 1.3
 	 */
-	public static Try<Object> tryReadFieldValue(Field field, Object instance) {
+	@API(status = INTERNAL, since = "1.3")
+	public static Try<Object> tryToReadFieldValue(Field field, Object instance) {
 		Preconditions.notNull(field, "Field must not be null");
 
-		return Try.call(() -> {
-			makeAccessible(field);
-			return field.get(instance);
-		});
+		return Try.call(() -> makeAccessible(field).get(instance));
 	}
 
 	/**
@@ -528,16 +577,21 @@ public final class ReflectionUtils {
 
 	/**
 	 * @see org.junit.platform.commons.support.ReflectionSupport#loadClass(String)
+	 * @deprecated Please use {@link #tryToLoadClass(String)} instead.
 	 */
+	@API(status = DEPRECATED, since = "1.3")
+	@Deprecated
 	public static Optional<Class<?>> loadClass(String name) {
-		return tryLoadClass(name).toOptional();
+		return tryToLoadClass(name).toOptional();
 	}
 
 	/**
-	 * @see org.junit.platform.commons.support.ReflectionSupport#loadClass(String)
+	 * @see org.junit.platform.commons.support.ReflectionSupport#tryToLoadClass(String)
+	 * @since 1.3
 	 */
-	public static Try<Class<?>> tryLoadClass(String name) {
-		return tryLoadClass(name, ClassLoaderUtils.getDefaultClassLoader());
+	@API(status = INTERNAL, since = "1.3")
+	public static Try<Class<?>> tryToLoadClass(String name) {
+		return tryToLoadClass(name, ClassLoaderUtils.getDefaultClassLoader());
 	}
 
 	/**
@@ -550,23 +604,29 @@ public final class ReflectionUtils {
 	 * @param name the name of the class to load; never {@code null} or blank
 	 * @param classLoader the {@code ClassLoader} to use; never {@code null}
 	 * @see #loadClass(String)
+	 * @deprecated Please use {@link #tryToLoadClass(String, ClassLoader)}
+	 * instead.
 	 */
+	@API(status = DEPRECATED, since = "1.3")
+	@Deprecated
 	public static Optional<Class<?>> loadClass(String name, ClassLoader classLoader) {
-		return tryLoadClass(name, classLoader).toOptional();
+		return tryToLoadClass(name, classLoader).toOptional();
 	}
 
 	/**
-	 * Load a class by its <em>primitive name</em> or <em>fully qualified name</em>,
-	 * using the supplied {@link ClassLoader}.
+	 * Try to load a class by its <em>primitive name</em> or <em>fully qualified
+	 * name</em>, using the supplied {@link ClassLoader}.
 	 *
-	 * <p>See {@link org.junit.platform.commons.support.ReflectionSupport#loadClass(String)}
+	 * <p>See {@link org.junit.platform.commons.support.ReflectionSupport#tryToLoadClass(String)}
 	 * for details on support for class names for arrays.
 	 *
 	 * @param name the name of the class to load; never {@code null} or blank
 	 * @param classLoader the {@code ClassLoader} to use; never {@code null}
-	 * @see #loadClass(String)
+	 * @see #tryToLoadClass(String)
+	 * @since 1.3
 	 */
-	public static Try<Class<?>> tryLoadClass(String name, ClassLoader classLoader) {
+	@API(status = INTERNAL, since = "1.3")
+	public static Try<Class<?>> tryToLoadClass(String name, ClassLoader classLoader) {
 		Preconditions.notBlank(name, "Class name must not be null or blank");
 		Preconditions.notNull(classLoader, "ClassLoader must not be null");
 		String trimmedName = name.trim();
@@ -968,12 +1028,33 @@ public final class ReflectionUtils {
 	 * @return an {@code Optional} containing the method; never {@code null} but
 	 * empty if the invocation of {@code Class#getMethod()} throws a
 	 * {@link NoSuchMethodException}
+	 * @deprecated Please use {@link #tryToGetMethod(Class, String, Class[])}
+	 * instead.
 	 */
+	@API(status = DEPRECATED, since = "1.3")
+	@Deprecated
 	static Optional<Method> getMethod(Class<?> clazz, String methodName, Class<?>... parameterTypes) {
-		return tryGetMethod(clazz, methodName, parameterTypes).toOptional();
+		return tryToGetMethod(clazz, methodName, parameterTypes).toOptional();
 	}
 
-	static Try<Method> tryGetMethod(Class<?> clazz, String methodName, Class<?>... parameterTypes) {
+	/**
+	 * Try to get the {@link Method} in the specified class with the specified
+	 * name and parameter types.
+	 *
+	 * <p>This method delegates to {@link Class#getMethod(String, Class...)} but
+	 * catches any exception thrown.
+	 *
+	 * @param clazz the class in which to search for the method; never {@code null}
+	 * @param methodName the name of the method to get; never {@code null} or blank
+	 * @param parameterTypes the parameter types of the method; may be {@code null}
+	 * or empty
+	 * @return a successful {@link Try} containing the method or a failed
+	 * {@link Try} containing the {@link NoSuchMethodException} thrown by
+	 * {@code Class#getMethod()}; never {@code null}
+	 * @since 1.3
+	 */
+	@API(status = INTERNAL, since = "1.3")
+	public static Try<Method> tryToGetMethod(Class<?> clazz, String methodName, Class<?>... parameterTypes) {
 		Preconditions.notNull(clazz, "Class must not be null");
 		Preconditions.notBlank(methodName, "Method name must not be null or blank");
 
@@ -1002,7 +1083,7 @@ public final class ReflectionUtils {
 
 	private static Class<?> loadRequiredParameterType(Class<?> clazz, String methodName, String typeName) {
 		// @formatter:off
-		return tryLoadClass(typeName)
+		return tryToLoadClass(typeName)
 				.getOrThrow(cause -> new JUnitException(
 						String.format("Failed to load parameter type [%s] for method [%s] in class [%s].",
 								typeName, methodName, clazz.getName()), cause));

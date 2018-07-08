@@ -73,7 +73,7 @@ public enum DefaultParallelExecutionConfigurationStrategy implements ParallelExe
 		public ParallelExecutionConfiguration createConfiguration(ConfigurationParameters configurationParameters) {
 			String className = configurationParameters.get(CONFIG_CUSTOM_CLASS_PROPERTY_NAME).orElseThrow(
 				() -> new JUnitException(CONFIG_CUSTOM_CLASS_PROPERTY_NAME + " must be set"));
-			return ReflectionUtils.tryLoadClass(className) //
+			return ReflectionUtils.tryToLoadClass(className) //
 					.andThenTry(strategyClass -> {
 						Preconditions.condition(
 							ParallelExecutionConfigurationStrategy.class.isAssignableFrom(strategyClass),
